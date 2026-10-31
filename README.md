@@ -1,10 +1,7 @@
-# My New Project
+# AI-Powered Customer Support and Ticket Resolver
 
-## Description
-This project is currently under development.
+An AI-powered customer support platform designed to intelligently classify support tickets, retrieve relevant information, and assist in generating context-aware responses using Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG).
 
-## Technologies
-- Python
-- FastAPI
-- PostgreSQL
-- Redis
+## Project Status
+
+🚧 Under Development
