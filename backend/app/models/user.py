@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import String, Boolean , DateTime, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped , mapped_column
+from sqlalchemy.orm import Mapped , mapped_column, relationship
 
 from app.database.base import Base
 
@@ -17,7 +17,7 @@ class User(Base):
         ),
     )
     
-    id: Mapped[str] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key= True,
         default=uuid.uuid4
@@ -65,4 +65,44 @@ class User(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
+    )
+    
+    created_tickets = relationship(
+    "Ticket",
+    foreign_keys="Ticket.customer_id",
+    back_populates="customer",
+    )
+
+    assigned_tickets = relationship(
+    "Ticket",
+    foreign_keys="Ticket.assigned_agent_id",
+    back_populates="assigned_agent",
+    )
+    
+    sent_messages = relationship(
+    "TicketMessage",
+    foreign_keys="TicketMessage.sender_id",
+    back_populates="sender",
+    )
+    
+    received_assignments = relationship(
+    "TicketAssignment",
+    foreign_keys="TicketAssignment.agent_id",
+    back_populates="agent",
+    )
+
+    created_assignments = relationship(
+    "TicketAssignment",
+    foreign_keys="TicketAssignment.assigned_by",
+    back_populates="assigner",
+    )
+    audit_logs = relationship(
+    "AuditLog",
+    back_populates="user",
+    )
+    
+    notifications = relationship(
+    "Notification",
+    back_populates="user",
+    cascade="all, delete-orphan",
     )
