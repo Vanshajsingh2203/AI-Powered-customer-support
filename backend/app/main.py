@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.database.session import get_db
 
+from app.api.v1.router import api_router
 
 app = FastAPI(title = "Customer Support AI",
               description="AI powered customer support and ticket management system",
@@ -25,3 +26,8 @@ async def database_check(db : AsyncSession = Depends(get_db)):
         "database": "connected",
         "result": result.scalar_one()
     }
+    
+app.include_router(
+    api_router,
+    prefix="/api/v1",
+)
