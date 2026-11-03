@@ -20,3 +20,15 @@ class TicketUpdate(BaseModel):
     description: str | None = Field(default = None , min_length=10)
     
     model_config = ConfigDict(from_attributes=True)
+    
+class TicketAssign(BaseModel):
+    agent_id: UUID
+    
+class TicketAssignmentResponse(BaseModel):
+    id: UUID
+    ticket_id: UUID
+    agent_id: UUID
+    assigned_by: UUID
+    assigned_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
