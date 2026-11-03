@@ -1,11 +1,10 @@
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/login"
-)
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+bearer_scheme = HTTPBearer()
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,10 +13,10 @@ from app.database.session import get_db
 from app.models.user import User
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-
+    token = credentials.credentials
     # Verify the access token
     payload = verify_access_token(token)
 
