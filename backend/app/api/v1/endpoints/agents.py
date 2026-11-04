@@ -5,10 +5,13 @@ from app.database.session import get_db
 from app.models.user import User
 from app.core.permissions import require_roles
 from app.services.assignment_service import AssignmentService
-from app.schemas.ticket import TicketResponse, TicketAssign, TicketAssignmentResponse
+from app.schemas.ticket import TicketResponse, TicketAssign, TicketAssignmentResponse, TicketAgentUpdate
+from app.services.ticket_service import TicketService
+
 
 router = APIRouter()
 assignment_service = AssignmentService()
+ticket_service = TicketService()
 
 @router.get('/tickets', response_model=list[TicketResponse])
 async def get_assigned_tickets(
@@ -45,6 +48,38 @@ async def assign_ticket(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
+        )
+
+    except Exception:
+        await db.rollback()
+        raise
+
+@router.patch('/tickets/{ticket_id}', response_model=TicketResponse)
+async def update_assigned_ticket(
+    ticket_id: UUID,
+    update_data:TicketAgentUpdate,
+    db:AsyncSession = Depends(get_db),
+    current_user : User = Depends(require_roles("AGENT", "ADMIN"))
+):
+    try:
+        ticket = await ticket_service.update_ticket_by_agent(db, ticket_id, update_data, current_user)
+        
+        if ticket is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found",
+            )
+            
+        await db.commit()
+        await db.refresh(ticket)
+        
+        return ticket
+    
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
         )
 
     except Exception:

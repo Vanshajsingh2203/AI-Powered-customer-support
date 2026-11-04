@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 from datetime import datetime
+from typing import Literal
 
 class TicketCreate(BaseModel):
     title : str = Field(min_length=5 , max_length=200)
@@ -32,3 +33,21 @@ class TicketAssignmentResponse(BaseModel):
     assigned_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+    
+class TicketAgentUpdate(BaseModel):
+    status: Literal[
+        "OPEN",
+        "IN_PROGRESS",
+        "WAITING_ON_CUSTOMER",
+        "RESOLVED",
+        "CLOSED",
+    ] | None = None
+
+    priority: Literal[
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "URGENT",
+    ] | None = None
+
+    model_config = ConfigDict(extra="forbid")
