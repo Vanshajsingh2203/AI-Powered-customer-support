@@ -4,6 +4,9 @@ from app.api.v1.endpoints import auth
 from app.api.v1.endpoints import tickets
 from app.api.v1.endpoints import messages
 from app.api.v1.endpoints import agents
+from app.api.v1.endpoints import attachments
+from app.api.v1.endpoints import admin
+
 
 api_router = APIRouter()
 
@@ -31,3 +34,20 @@ api_router.include_router(
     tags=["Agents"],
 )
 
+api_router.include_router(
+    attachments.router,
+    tags=["Attachments"]
+)
+
+from app.api.v1.endpoints import notifications
+
+api_router.include_router(
+    notifications.router,
+    prefix="/notifications",
+)
+
+api_router.include_router(
+    admin.router,
+    prefix="/admin",
+    tags=["Admin"],
+)

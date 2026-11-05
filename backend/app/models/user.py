@@ -112,3 +112,8 @@ class User(Base):
     back_populates="user",
     cascade="all, delete-orphan",
     )
+    
+    attachments = relationship(
+    "Attachment",
+    back_populates="uploader"
+    )

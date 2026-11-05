@@ -62,3 +62,8 @@ class TicketMessage(Base):
         foreign_keys=[sender_id],
         back_populates="sent_messages",
     )
+    
+    attachments = relationship(
+    "Attachment",
+    back_populates="message"
+    )
