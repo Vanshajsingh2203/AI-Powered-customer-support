@@ -39,4 +39,73 @@ class AdminService:
 
         return agent
     
+    async def get_agents(self, db:AsyncSession):
+        result = await db.execute(
+            select(User)
+            .where(User.role=="AGENT")
+            .order_by(User.created_at.desc())
+        )
+        
+        return result.scalars().all()
+    
+    async def get_agent_by_id(self, db: AsyncSession, agent_id: UUID):
+        result = await db.execute(
+        select(User).where(
+            User.id == agent_id,
+            User.role == "AGENT"
+            )
+        )
+
+        return result.scalar_one_or_none()
+    
+    async def update_user_status(
+    self,
+    db: AsyncSession,
+    user_id: UUID,
+    role: str,
+    is_active: bool
+):
+        result = await db.execute(
+            select(User).where(
+                User.id == user_id,
+                User.role == role
+            )
+        )
+    
+        user = result.scalar_one_or_none()
+    
+        if user is None:
+            return None
+    
+        user.is_active = is_active
+    
+        await db.flush()
+    
+        return user
+    
+    async def get_customers(self, db: AsyncSession):
+        result = await db.execute(
+        select(User)
+        .where(User.role == "CUSTOMER")
+        .order_by(User.created_at.desc())
+        )
+
+        return result.scalars().all()
+    
+    async def get_customer_by_id(
+    self,
+    db: AsyncSession,
+    customer_id: UUID
+):
+        result = await db.execute(
+        select(User).where(
+            User.id == customer_id,
+            User.role == "CUSTOMER"
+            )
+        )
+
+        return result.scalar_one_or_none()
+    
+    
+    
 admin_service = AdminService()            
