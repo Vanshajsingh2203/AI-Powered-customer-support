@@ -220,3 +220,29 @@ class AuthService:
             "refresh_token": new_refresh_token,
             "token_type": "bearer",
         }
+
+    async def logout_user(
+    self,
+    db: AsyncSession,
+    raw_refresh_token: str,
+) -> None:
+
+        token_hash = hash_refresh_token(raw_refresh_token)
+    
+        result = await db.execute(
+            select(RefreshToken)
+            .where(RefreshToken.token_hash == token_hash)
+            .with_for_update()
+        )
+    
+        stored_token = result.scalar_one_or_none()
+    
+        if stored_token is None:
+            raise ValueError("Invalid refresh token")
+    
+        if stored_token.revoked_at is not None:
+            raise ValueError("Refresh token already revoked")
+    
+        stored_token.revoked_at = datetime.now(timezone.utc)
+    
+        await db.flush()
