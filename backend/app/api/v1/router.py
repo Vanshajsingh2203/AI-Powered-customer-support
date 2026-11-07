@@ -6,7 +6,7 @@ from app.api.v1.endpoints import messages
 from app.api.v1.endpoints import agents
 from app.api.v1.endpoints import attachments
 from app.api.v1.endpoints import admin
-
+from app.api.v1.endpoints import analytics
 
 api_router = APIRouter()
 
@@ -50,4 +50,10 @@ api_router.include_router(
     admin.router,
     prefix="/admin",
     tags=["Admin"],
+)
+
+api_router.include_router(
+    analytics.router,
+    prefix="/admin/analytics",
+    tags=["Admin Analytics"],
 )
