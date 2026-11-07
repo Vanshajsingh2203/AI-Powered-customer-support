@@ -8,7 +8,7 @@ from app.schemas.auth import UserResponse
 from app.database.session import get_db
 from app.core.permissions import require_roles
 from app.services.admin_service import admin_service
-from app.schemas.category import CategoryCreate, CategoryResponse
+from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
 from app.services.category_service import category_service
 
 router = APIRouter()
@@ -158,6 +158,112 @@ async def create_category(
         await db.refresh(category)
 
         return category
+
+    except ValueError as exc:
+        await db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc)
+        )
+
+    except Exception:
+        await db.rollback()
+        raise
+    
+@router.get(
+    "/categories",
+    response_model=list[CategoryResponse]
+)
+async def get_categories(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("ADMIN"))
+):
+    return await category_service.get_categories(db=db)
+
+@router.get(
+    "/categories/{category_id}",
+    response_model=CategoryResponse
+)
+async def get_category_by_id(
+    category_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("ADMIN"))
+):
+    category = await category_service.get_category_by_id(
+        db=db,
+        category_id=category_id
+    )
+
+    if category is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found"
+        )
+
+    return category
+
+@router.patch(
+    "/categories/{category_id}",
+    response_model=CategoryResponse
+)
+async def update_category(
+    category_id: UUID,
+    category_data: CategoryUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("ADMIN"))
+):
+    try:
+        category = await category_service.update_category(
+            db=db,
+            category_id=category_id,
+            category_data=category_data
+        )
+
+        if category is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Category not found"
+            )
+
+        await db.commit()
+        await db.refresh(category)
+
+        return category
+
+    except ValueError as exc:
+        await db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        )
+
+    except Exception:
+        await db.rollback()
+        raise
+    
+@router.delete("/categories/{category_id}")
+async def delete_category(
+    category_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("ADMIN"))
+):
+    try:
+        result = await category_service.delete_category(
+            db=db,
+            category_id=category_id
+        )
+
+        if result is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Category not found"
+            )
+
+        await db.commit()
+
+        return {"message": "Category deleted successfully"}
 
     except ValueError as exc:
         await db.rollback()

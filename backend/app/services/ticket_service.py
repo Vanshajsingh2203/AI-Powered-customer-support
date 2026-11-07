@@ -1,41 +1,82 @@
 from uuid import UUID
-
-from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime , timezone
 from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate, TicketAgentUpdate
 from app.models.user import User
 from app.services.audit_service import audit_service
+from app.models.category import Category
 
 class TicketService:
-    async def create_ticket(self, db:AsyncSession, ticket_data: TicketCreate, current_user: User)->Ticket:
+    async def create_ticket(
+    self,
+    db: AsyncSession,
+    ticket_data: TicketCreate,
+    current_user: User
+) -> Ticket:
+
+        category = None
+
+        if ticket_data.category_id is not None:
+            result = await db.execute(
+                select(Category).where(
+                    Category.id == ticket_data.category_id
+                )
+            )
+
+            category = result.scalar_one_or_none()
+
+            if category is None:
+                raise ValueError("Invalid category ID")
+
         new_ticket = Ticket(
-            title = ticket_data.title,
-            description = ticket_data.description,
-            customer_id = current_user.id,
-            priority = 'MEDIUM',
+            title=ticket_data.title,
+            description=ticket_data.description,
+            customer_id=current_user.id,
+            category_id=category.id if category else None,
+            priority="MEDIUM",
             status="OPEN",
         )
-        
+
         db.add(new_ticket)
-        
+
         await db.flush()
-        
+
         return new_ticket
     
-    async def get_ticket(self, db:AsyncSession, current_user:User):
-        
-        result = await db.execute(
-            select(Ticket).where(Ticket.customer_id == current_user.id)
+    async def get_ticket(
+    self,
+    db: AsyncSession,
+    current_user: User,
+    category_id: UUID | None = None,
+    status: str | None = None,
+):
+        query = (
+            select(Ticket)
+            .options(selectinload(Ticket.category))
+            .where(Ticket.customer_id == current_user.id)
         )
-        
+
+        if category_id is not None:
+            query = query.where(Ticket.category_id == category_id)
+
+        if status is not None:
+            query = query.where(Ticket.status == status.upper())
+
+        query = query.order_by(Ticket.created_at.desc())
+
+        result = await db.execute(query)
+
         return result.scalars().all()
-    
+
     async def get_ticket_by_id(self, db:AsyncSession, ticket_id:UUID, current_user: User):
-        result = await db.execute(select(Ticket).where(
-            Ticket.id == ticket_id,
-            Ticket.customer_id== current_user.id
+        result = await db.execute(select(Ticket)
+            .options(selectinload(Ticket.category))
+            .where(
+                Ticket.id == ticket_id,
+                Ticket.customer_id== current_user.id
             )
         )
         
@@ -68,6 +109,7 @@ class TicketService:
     ):
         result = await db.execute(
             select(Ticket)
+            .options(selectinload(Ticket.category))
             .where(Ticket.id == ticket_id)
             .with_for_update()
         )
@@ -158,6 +200,123 @@ class TicketService:
         await db.flush()
     
         return ticket
+            
+    def to_ticket_response(self, ticket: Ticket) -> TicketResponse:
+        return TicketResponse(
+        id=ticket.id,
+        title=ticket.title,
+        description=ticket.description,
+        status=ticket.status,
+        priority=ticket.priority,
+        created_at=ticket.created_at,
+        updated_at=ticket.updated_at,
+        category_id=ticket.category_id,
+        category_name=ticket.category.name if ticket.category else None,
+    )
+            
+    async def list_tickets(
+    self,
+    db: AsyncSession,
+    current_user: User,
+    category_id: UUID | None = None,
+    status: str | None = None,
+    priority: str | None = None,
+    search: str | None = None,
+    assigned_agent_id: UUID | None = None,
+    page: int = 1,
+    limit: int = 10,
+    sort_order: str = "desc",
+):
+        query = select(Ticket).options(
+            selectinload(Ticket.category)
+        )
 
-            
-            
+        conditions = []
+
+        # Role-based access restrictions
+        if current_user.role == "CUSTOMER":
+            conditions.append(Ticket.customer_id == current_user.id)
+
+        elif current_user.role == "AGENT":
+            conditions.append(
+                Ticket.assigned_agent_id == current_user.id
+            )
+
+        elif current_user.role != "ADMIN":
+            raise ValueError("Invalid user role")
+
+        # Filters
+        if category_id is not None:
+            conditions.append(Ticket.category_id == category_id)
+
+        if status is not None:
+            conditions.append(Ticket.status == status.upper())
+
+        if priority is not None:
+            conditions.append(Ticket.priority == priority.upper())
+
+        if search:
+            search_term = f"%{search.strip()}%"
+            conditions.append(
+                Ticket.title.ilike(search_term)
+                | Ticket.description.ilike(search_term)
+            )
+
+        if assigned_agent_id is not None:
+            if current_user.role != "ADMIN":
+                raise ValueError(
+                    "Only admins can filter by assigned agent"
+                )
+
+            conditions.append(
+                Ticket.assigned_agent_id == assigned_agent_id
+            )
+
+        # Apply conditions to the query
+        query = query.where(*conditions)
+
+        # Get total matching records before pagination
+        count_query = (
+            select(func.count(Ticket.id))
+            .where(*conditions)
+        )
+
+        count_result = await db.execute(count_query)
+        total = count_result.scalar_one()
+
+        # Sorting
+        if sort_order.lower() == "asc":
+            query = query.order_by(Ticket.created_at.asc())
+        else:
+            query = query.order_by(Ticket.created_at.desc())
+
+        # Pagination
+        offset = (page - 1) * limit
+
+        query = query.offset(offset).limit(limit)
+
+        result = await db.execute(query)
+        tickets = result.scalars().all()
+
+        total_pages = (total + limit - 1) // limit
+
+        return {
+            "items": tickets,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+        }
+        
+    async def get_ticket_with_category(
+    self,
+    db: AsyncSession,
+    ticket_id: UUID
+):
+        result = await db.execute(
+        select(Ticket)
+        .options(selectinload(Ticket.category))
+        .where(Ticket.id == ticket_id)
+        )
+
+        return result.scalar_one_or_none()

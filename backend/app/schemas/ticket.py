@@ -6,7 +6,8 @@ from typing import Literal
 class TicketCreate(BaseModel):
     title : str = Field(min_length=5 , max_length=200)
     description: str = Field(min_length=10)
-
+    category_id: UUID | None = None
+    
 class TicketResponse(BaseModel):
     id:UUID
     title: str
@@ -15,6 +16,10 @@ class TicketResponse(BaseModel):
     priority: str
     created_at: datetime
     updated_at: datetime
+    category_id: UUID | None = None
+    category_name: str | None = None
+    
+    model_config = ConfigDict(from_attributes=True)
     
 class TicketUpdate(BaseModel):
     title: str| None= Field(default = None, min_length = 5, max_length=200)
@@ -51,3 +56,10 @@ class TicketAgentUpdate(BaseModel):
     ] | None = None
 
     model_config = ConfigDict(extra="forbid")
+    
+class TicketListResponse(BaseModel):
+    items: list[TicketResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
