@@ -1,0 +1,16 @@
+
+#root {
+  min-height: 100vh;
+}
+
+.min-vh-75 {
+  min-height: 75vh;
+}
+
+button {
+  transition: all 0.2s ease-in-out;
+}
+
+.card {
+  border-radius: 16px;
+}
