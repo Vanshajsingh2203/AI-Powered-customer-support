@@ -72,13 +72,30 @@ class TicketService:
         return result.scalars().all()
 
     async def get_ticket_by_id(self, db:AsyncSession, ticket_id:UUID, current_user: User):
-        result = await db.execute(select(Ticket)
-            .options(selectinload(Ticket.category))
-            .where(
-                Ticket.id == ticket_id,
-                Ticket.customer_id== current_user.id
-            )
+        query = (
+        select(Ticket)
+        .options(selectinload(Ticket.category))
+        .where(Ticket.id == ticket_id)
+    )
+
+        
+        # Customers can access only their own tickets.
+        if current_user.role == "CUSTOMER":
+            query = query.where(
+                Ticket.customer_id == current_user.id
         )
+            
+            # Agents can access only tickets assigned to them.
+        elif current_user.role == "AGENT":
+            query = query.where(
+                Ticket.assigned_agent_id == current_user.id
+        )
+            
+        # Admins can access all tickets.
+        elif current_user.role != "ADMIN":
+            return None
+        
+        result = await db.execute(query)
         
         return result.scalar_one_or_none()
     

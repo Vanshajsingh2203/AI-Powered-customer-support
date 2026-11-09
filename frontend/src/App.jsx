@@ -7,13 +7,18 @@ import {
   Routes,
   useNavigate,
 } from 'react-router-dom';
+
 import CustomerDashboard from './pages/CustomerDashboard';
 import CreateTicketPage from './pages/CreateTicketPage';
-import { useAuth } from './context/AuthContext';
-import ProtectedRoute from './routes/ProtectedRoute';
+import TicketDetailsPage from './pages/TicketDetailsPage';
+import AgentDashboard from './pages/AgentDashboard';
+import AgentTicketDetailsPage from './pages/AgentTicketDetailsPage';
 
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+
+import { useAuth } from './context/AuthContext';
+import ProtectedRoute from './routes/ProtectedRoute';
 
 // Homepage
 function HomePage() {
@@ -147,7 +152,6 @@ function HomePage() {
 }
 
 // Temporary dashboard placeholder.
-// We will replace these with actual dashboards later.
 function DashboardPlaceholder({ role }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -161,9 +165,7 @@ function DashboardPlaceholder({ role }) {
     <div className="container py-5">
       <div className="card border-0 shadow-sm">
         <div className="card-body p-5">
-          <h2 className="fw-bold">
-            {role} Dashboard
-          </h2>
+          <h2 className="fw-bold">{role} Dashboard</h2>
 
           <p className="text-muted">
             Welcome, {user?.full_name}.
@@ -205,6 +207,7 @@ function UnauthorizedPage() {
   );
 }
 
+// Application routes
 function App() {
   return (
     <BrowserRouter>
@@ -215,6 +218,7 @@ function App() {
 
         <Route path="/register" element={<RegisterPage />} />
 
+        {/* Customer dashboard */}
         <Route
           path="/customer/dashboard"
           element={
@@ -224,23 +228,7 @@ function App() {
           }
         />
 
-        <Route
-          path="/agent/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={['AGENT']}>
-              <DashboardPlaceholder role="Agent" />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardPlaceholder role="Admin" />
-            </ProtectedRoute>
-          }
-        />
+        {/* Customer ticket creation */}
         <Route
           path="/customer/tickets/create"
           element={
@@ -249,12 +237,58 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Customer ticket details */}
+        <Route
+          path="/customer/tickets/:ticketId"
+          element={
+            <ProtectedRoute allowedRoles={['CUSTOMER']}>
+              <TicketDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Agent dashboard */}
+        <Route
+          path="/agent/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['AGENT']}>
+              <AgentDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Agent ticket details */}
+        <Route
+          path="/agent/tickets/:ticketId"
+          element={
+            <ProtectedRoute allowedRoles={['AGENT']}>
+              <AgentTicketDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin dashboard */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <DashboardPlaceholder role="Admin" />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Unauthorized access */}
         <Route
           path="/unauthorized"
           element={<UnauthorizedPage />}
         />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Unknown routes */}
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
+        />
       </Routes>
     </BrowserRouter>
   );

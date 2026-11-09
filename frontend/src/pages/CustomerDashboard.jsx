@@ -155,7 +155,7 @@ function CustomerDashboard() {
             <span className="badge bg-primary-subtle text-primary p-2">
               Customer Account
             </span>
-            
+
             <Link
               to="/customer/tickets/create"
               className="btn btn-primary"
@@ -303,9 +303,12 @@ function CustomerDashboard() {
                       {tickets.map((ticket) => (
                         <tr key={ticket.id}>
                           <td>
-                            <div className="fw-semibold">
+                            <Link
+                              to={`/customer/tickets/${ticket.id}`}
+                              className="fw-semibold text-decoration-none"
+                            >
                               {ticket.title}
-                            </div>
+                            </Link>
 
                             <div
                               className="text-muted small"
