@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getCustomerTickets } from '../api/tickets';
 import { useAuth } from '../context/AuthContext';
 
+
+
 function CustomerDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -149,10 +151,17 @@ function CustomerDashboard() {
             </p>
           </div>
 
-          <div>
+          <div className="d-flex align-items-center gap-3 flex-wrap">
             <span className="badge bg-primary-subtle text-primary p-2">
               Customer Account
             </span>
+            
+            <Link
+              to="/customer/tickets/create"
+              className="btn btn-primary"
+            >
+              + Create New Ticket
+            </Link>
           </div>
         </div>
 

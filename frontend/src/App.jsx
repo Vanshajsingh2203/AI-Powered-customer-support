@@ -8,7 +8,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import CustomerDashboard from './pages/CustomerDashboard';
-
+import CreateTicketPage from './pages/CreateTicketPage';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 
@@ -241,7 +241,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/customer/tickets/create"
+          element={
+            <ProtectedRoute allowedRoles={['CUSTOMER']}>
+              <CreateTicketPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/unauthorized"
           element={<UnauthorizedPage />}
