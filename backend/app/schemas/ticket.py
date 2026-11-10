@@ -18,8 +18,13 @@ class TicketResponse(BaseModel):
     updated_at: datetime
     category_id: UUID | None = None
     category_name: str | None = None
+    assigned_agent_id: UUID | None = None
+    assigned_agent_name: str | None = None
+    customer_name: str
+    customer_email: str
     
     model_config = ConfigDict(from_attributes=True)
+    
     
 class TicketUpdate(BaseModel):
     title: str| None= Field(default = None, min_length = 5, max_length=200)
@@ -63,3 +68,4 @@ class TicketListResponse(BaseModel):
     page: int
     limit: int
     total_pages: int
+    

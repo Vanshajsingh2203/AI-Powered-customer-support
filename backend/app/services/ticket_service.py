@@ -74,7 +74,10 @@ class TicketService:
     async def get_ticket_by_id(self, db:AsyncSession, ticket_id:UUID, current_user: User):
         query = (
         select(Ticket)
-        .options(selectinload(Ticket.category))
+        .options(selectinload(Ticket.category),
+                 selectinload(Ticket.assigned_agent),
+                 selectinload(Ticket.customer)
+        )
         .where(Ticket.id == ticket_id)
     )
 
@@ -229,6 +232,15 @@ class TicketService:
         updated_at=ticket.updated_at,
         category_id=ticket.category_id,
         category_name=ticket.category.name if ticket.category else None,
+        customer_name=ticket.customer.full_name,
+        customer_email=ticket.customer.email,
+        assigned_agent_id=ticket.assigned_agent_id,
+        assigned_agent_name=(
+            ticket.assigned_agent.full_name
+            if ticket.assigned_agent
+            else None
+        ),
+        
     )
             
     async def list_tickets(
@@ -245,7 +257,9 @@ class TicketService:
     sort_order: str = "desc",
 ):
         query = select(Ticket).options(
-            selectinload(Ticket.category)
+            selectinload(Ticket.category),
+            selectinload(Ticket.assigned_agent),
+            selectinload(Ticket.customer),
         )
 
         conditions = []

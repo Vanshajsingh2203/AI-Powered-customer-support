@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
+
 import {
   getAgentTicketById,
   updateAssignedTicket,
@@ -29,6 +30,12 @@ const priorityOptions = [
   'URGENT',
 ];
 
+const roleLabels = {
+  CUSTOMER: 'Customer',
+  AGENT: 'Agent',
+  ADMIN: 'Administrator',
+};
+
 function AgentTicketDetailsPage() {
   const { ticketId } = useParams();
   const { user } = useAuth();
@@ -37,6 +44,9 @@ function AgentTicketDetailsPage() {
   const [messages, setMessages] = useState([]);
 
   const [newMessage, setNewMessage] = useState('');
+
+  // PUBLIC or INTERNAL.
+  const [activeTab, setActiveTab] = useState('PUBLIC');
 
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('');
@@ -48,6 +58,7 @@ function AgentTicketDetailsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Load ticket and conversation.
   useEffect(() => {
     const loadTicketData = async () => {
       try {
@@ -80,6 +91,7 @@ function AgentTicketDetailsPage() {
     loadTicketData();
   }, [ticketId]);
 
+  // Send a public reply or internal note.
   const handleSendMessage = async (event) => {
     event.preventDefault();
 
@@ -96,6 +108,7 @@ function AgentTicketDetailsPage() {
 
       const sentMessage = await sendTicketMessage(ticketId, {
         content,
+        is_internal: activeTab === 'INTERNAL',
       });
 
       setMessages((previousMessages) => [
@@ -104,6 +117,12 @@ function AgentTicketDetailsPage() {
       ]);
 
       setNewMessage('');
+
+      setSuccess(
+        activeTab === 'INTERNAL'
+          ? 'Internal note added successfully.'
+          : 'Public reply sent successfully.'
+      );
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -114,6 +133,7 @@ function AgentTicketDetailsPage() {
     }
   };
 
+  // Update ticket status or priority.
   const handleUpdateTicket = async (event) => {
     event.preventDefault();
 
@@ -174,7 +194,7 @@ function AgentTicketDetailsPage() {
         </div>
 
         <Link to="/agent/dashboard" className="btn btn-primary">
-          Back to Dashboard
+          Back to Agent Dashboard
         </Link>
       </div>
     );
@@ -185,8 +205,25 @@ function AgentTicketDetailsPage() {
     ...(allowedStatusTransitions[ticket.status] || []),
   ];
 
+  // Display messages belonging to the selected tab.
+  const visibleMessages = messages.filter((message) =>
+    activeTab === 'INTERNAL'
+      ? message.is_internal
+      : !message.is_internal
+  );
+
+  const publicMessageCount = messages.filter(
+    (message) => !message.is_internal
+  ).length;
+
+  const internalMessageCount = messages.filter(
+    (message) => message.is_internal
+  ).length;
+
   return (
     <div className="container py-4">
+
+      {/* Navigation */}
       <div className="mb-4">
         <Link
           to="/agent/dashboard"
@@ -196,12 +233,14 @@ function AgentTicketDetailsPage() {
         </Link>
       </div>
 
+      {/* Error */}
       {error && (
         <div className="alert alert-danger">
           {error}
         </div>
       )}
 
+      {/* Success */}
       {success && (
         <div className="alert alert-success">
           {success}
@@ -210,32 +249,56 @@ function AgentTicketDetailsPage() {
 
       {/* Ticket information */}
       <div className="card shadow-sm mb-4">
+        <div className="card-header bg-white">
+          <h5 className="mb-0">Ticket Information</h5>
+        </div>
+
         <div className="card-body">
           <h3>{ticket.title}</h3>
 
-          <p className="text-muted mb-3">
+          <p className="text-muted">
             Ticket ID: {ticket.id}
           </p>
 
           <p>{ticket.description}</p>
 
-          <div className="d-flex flex-wrap gap-3">
-            <span className="badge bg-primary">
-              Status: {ticket.status}
-            </span>
+          <hr />
 
-            <span className="badge bg-warning text-dark">
-              Priority: {ticket.priority}
-            </span>
+          <div className="row g-3">
 
-            <span className="badge bg-secondary">
-              Category: {ticket.category_name || 'Uncategorized'}
-            </span>
+            <div className="col-md-4">
+              <strong>Customer</strong>
+              <p>{ticket.customer_name || 'Not available'}</p>
+            </div>
+
+            <div className="col-md-4">
+              <strong>Category</strong>
+              <p>{ticket.category_name || 'Uncategorized'}</p>
+            </div>
+
+            <div className="col-md-4">
+              <strong>Status</strong>
+              <p>
+                <span className="badge bg-primary">
+                  {ticket.status}
+                </span>
+              </p>
+            </div>
+
+            <div className="col-md-4">
+              <strong>Priority</strong>
+              <p>
+                <span className="badge bg-warning text-dark">
+                  {ticket.priority}
+                </span>
+              </p>
+            </div>
+
           </div>
         </div>
       </div>
 
-      {/* Status and priority management */}
+      {/* Ticket management */}
       <div className="card shadow-sm mb-4">
         <div className="card-header bg-white">
           <h5 className="mb-0">Manage Ticket</h5>
@@ -244,6 +307,7 @@ function AgentTicketDetailsPage() {
         <div className="card-body">
           <form onSubmit={handleUpdateTicket}>
             <div className="row g-3">
+
               <div className="col-md-5">
                 <label className="form-label">
                   Ticket Status
@@ -295,6 +359,7 @@ function AgentTicketDetailsPage() {
                   {updating ? 'Saving...' : 'Update'}
                 </button>
               </div>
+
             </div>
           </form>
         </div>
@@ -302,25 +367,97 @@ function AgentTicketDetailsPage() {
 
       {/* Conversation */}
       <div className="card shadow-sm">
+
         <div className="card-header bg-white">
-          <h5 className="mb-0">Conversation</h5>
+          <h5 className="mb-1">Ticket Conversation</h5>
+
+          <small className="text-muted">
+            Communicate with the customer or discuss the ticket privately with staff.
+          </small>
         </div>
 
+        {/* Conversation tabs */}
+        <div className="card-header bg-white border-top">
+          <ul className="nav nav-tabs card-header-tabs">
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link ${
+                  activeTab === 'PUBLIC' ? 'active' : ''
+                }`}
+                onClick={() => {
+                  setActiveTab('PUBLIC');
+                  setError('');
+                  setSuccess('');
+                }}
+              >
+                Public Conversation
+                <span className="badge bg-success ms-2">
+                  {publicMessageCount}
+                </span>
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link ${
+                  activeTab === 'INTERNAL' ? 'active' : ''
+                }`}
+                onClick={() => {
+                  setActiveTab('INTERNAL');
+                  setError('');
+                  setSuccess('');
+                }}
+              >
+                Internal Discussion
+                <span className="badge bg-warning text-dark ms-2">
+                  {internalMessageCount}
+                </span>
+              </button>
+            </li>
+
+          </ul>
+        </div>
+
+        {/* Messages */}
         <div
           className="card-body"
           style={{
-            maxHeight: '450px',
+            minHeight: '300px',
+            maxHeight: '500px',
             overflowY: 'auto',
           }}
         >
-          {messages.length === 0 ? (
-            <p className="text-muted text-center">
-              No messages yet.
-            </p>
+
+          {visibleMessages.length === 0 ? (
+            <div className="text-center text-muted py-5">
+              <h6>
+                {activeTab === 'INTERNAL'
+                  ? 'No internal discussions yet.'
+                  : 'No public messages yet.'}
+              </h6>
+
+              <p className="mb-0 small">
+                {activeTab === 'INTERNAL'
+                  ? 'Internal notes added by staff will appear here.'
+                  : 'Customer messages and public replies will appear here.'}
+              </p>
+            </div>
           ) : (
-            messages.map((message) => {
+            visibleMessages.map((message) => {
               const isOwnMessage =
                 message.sender_id === user?.id;
+
+              const senderRole =
+                roleLabels[message.sender_role] ||
+                message.sender_role ||
+                'Unknown Role';
+
+              const senderName = isOwnMessage
+                ? 'You'
+                : message.sender_name || senderRole;
 
               return (
                 <div
@@ -333,37 +470,73 @@ function AgentTicketDetailsPage() {
                 >
                   <div
                     className={`p-3 rounded ${
-                      isOwnMessage
-                        ? 'bg-primary text-white'
-                        : 'bg-light'
+                      activeTab === 'INTERNAL'
+                        ? 'bg-warning-subtle border border-warning'
+                        : isOwnMessage
+                          ? 'bg-primary text-white'
+                          : 'bg-light border'
                     }`}
-                    style={{ maxWidth: '75%' }}
+                    style={{ maxWidth: '80%' }}
                   >
-                    <div className="small mb-1 fw-bold">
-                      {isOwnMessage ? 'You' : 'Customer'}
+
+                    {/* Sender information */}
+                    <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
+
+                      <strong className="small">
+                        {senderName}
+                      </strong>
+
+                      <span className="badge bg-secondary">
+                        {senderRole}
+                      </span>
+
                     </div>
 
-                    <div>{message.content}</div>
+                    {/* Message content */}
+                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                      {message.content}
+                    </div>
 
+                    {/* Timestamp */}
                     <div className="small mt-2 opacity-75">
                       {new Date(
                         message.created_at
                       ).toLocaleString()}
                     </div>
+
                   </div>
                 </div>
               );
             })
           )}
+
         </div>
 
+        {/* Message composer */}
         <div className="card-footer bg-white">
+
           <form onSubmit={handleSendMessage}>
+
+            {activeTab === 'PUBLIC' ? (
+              <div className="alert alert-success py-2">
+                <strong>Public Reply:</strong> This message will be visible to the customer, agents and administrators.
+              </div>
+            ) : (
+              <div className="alert alert-warning py-2">
+                <strong>Internal Discussion:</strong> This message will only be visible to agents and administrators.
+              </div>
+            )}
+
             <div className="input-group">
+
               <input
                 type="text"
                 className="form-control"
-                placeholder="Write a reply to the customer..."
+                placeholder={
+                  activeTab === 'INTERNAL'
+                    ? 'Write an internal note for staff...'
+                    : 'Write a reply to the customer...'
+                }
                 value={newMessage}
                 onChange={(event) =>
                   setNewMessage(event.target.value)
@@ -373,15 +546,27 @@ function AgentTicketDetailsPage() {
 
               <button
                 type="submit"
-                className="btn btn-primary"
+                className={`btn ${
+                  activeTab === 'INTERNAL'
+                    ? 'btn-warning'
+                    : 'btn-primary'
+                }`}
                 disabled={sending || !newMessage.trim()}
               >
-                {sending ? 'Sending...' : 'Send Reply'}
+                {sending
+                  ? 'Sending...'
+                  : activeTab === 'INTERNAL'
+                    ? 'Add Internal Note'
+                    : 'Send Public Reply'}
               </button>
+
             </div>
+
           </form>
         </div>
+
       </div>
+
     </div>
   );
 }

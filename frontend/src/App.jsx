@@ -17,6 +17,10 @@ import AdminDashboard from './pages/AdminDashboard';
 import AgentManagementPage from './pages/AgentManagementPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import CustomerManagementPage from './pages/CustomerManagementPage';
+import CategoryManagementPage from './pages/CategoryManagementPage';
+import AdminTicketManagementPage from './pages/AdminTicketManagementPage';
+import AdminTicketDetailsPage from './pages/AdminTicketDetailsPage';
 
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -283,6 +287,47 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
               <AgentManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/customers"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <CustomerManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/categories"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <CategoryManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tickets"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminTicketManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tickets"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminTicketManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Admin ticket details */}
+        <Route
+          path="/admin/tickets/:ticketId"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminTicketDetailsPage />
             </ProtectedRoute>
           }
         />

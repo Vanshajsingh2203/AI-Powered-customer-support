@@ -152,7 +152,24 @@ function AdminDashboard() {
           >
             Manage Agents
           </button>
-
+          <button
+            className="btn btn-outline-primary me-2"
+            onClick={() => navigate('/admin/customers')}
+          >
+            Manage Customers
+          </button>
+          <button
+            className="btn btn-outline-primary me-2"
+            onClick={() => navigate('/admin/tickets')}
+          >
+            Manage Tickets
+          </button>
+          <button
+            className="btn btn-outline-primary me-2"
+            onClick={() => navigate('/admin/categories')}
+          >
+            Manage Categories
+          </button>
           <button
             className="btn btn-danger"
             onClick={handleLogout}
