@@ -10,8 +10,11 @@ from app.core.permissions import require_roles
 from app.services.admin_service import admin_service
 from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
 from app.services.category_service import category_service
-
+from app.schemas.ticket import TicketListResponse
+from app.services.ticket_service import TicketService
+from fastapi import Query
 router = APIRouter()
+ticket_service = TicketService()
 
 @router.post('/agents', response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
 async def create_agent(
@@ -276,3 +279,55 @@ async def delete_category(
     except Exception:
         await db.rollback()
         raise
+    
+
+@router.get(
+    "/tickets",
+    response_model=TicketListResponse
+)
+async def get_all_tickets(
+    category_id: UUID | None = None,
+
+    status: str | None = Query(
+        default=None,
+        pattern="^(OPEN|IN_PROGRESS|WAITING_ON_CUSTOMER|RESOLVED|CLOSED)$"
+    ),
+
+    priority: str | None = Query(
+        default=None,
+        pattern="^(LOW|MEDIUM|HIGH|URGENT)$"
+    ),
+
+    assigned_agent_id: UUID | None = None,
+    search: str | None = None,
+
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+
+    sort_order: str = Query(
+        default="desc",
+        pattern="^(asc|desc)$"
+    ),
+
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("ADMIN"))
+):
+    result = await ticket_service.list_tickets(
+        db=db,
+        current_user=current_user,
+        category_id=category_id,
+        status=status,
+        priority=priority,
+        assigned_agent_id=assigned_agent_id,
+        search=search,
+        page=page,
+        limit=limit,
+        sort_order=sort_order
+    )
+
+    result["items"] = [
+        ticket_service.to_ticket_response(ticket)
+        for ticket in result["items"]
+    ]
+
+    return result

@@ -13,7 +13,8 @@ import CreateTicketPage from './pages/CreateTicketPage';
 import TicketDetailsPage from './pages/TicketDetailsPage';
 import AgentDashboard from './pages/AgentDashboard';
 import AgentTicketDetailsPage from './pages/AgentTicketDetailsPage';
-
+import AdminDashboard from './pages/AdminDashboard';
+import AgentManagementPage from './pages/AgentManagementPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
@@ -273,11 +274,18 @@ function App() {
           path="/admin/dashboard"
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
-              <DashboardPlaceholder role="Admin" />
+              <AdminDashboard />
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/admin/agents"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AgentManagementPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Unauthorized access */}
         <Route
           path="/unauthorized"
