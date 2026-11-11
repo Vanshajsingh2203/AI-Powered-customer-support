@@ -340,3 +340,5 @@ dist-ssr
 *.sln
 *.sw?
 
+# Local integration test credentials
+test_config.local.json

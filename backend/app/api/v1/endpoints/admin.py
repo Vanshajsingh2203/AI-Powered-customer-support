@@ -12,6 +12,7 @@ from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdat
 from app.services.category_service import category_service
 from app.schemas.ticket import TicketListResponse
 from app.services.ticket_service import TicketService
+from app.core.websocket_manager import websocket_manager
 from fastapi import Query
 router = APIRouter()
 ticket_service = TicketService()
@@ -67,24 +68,53 @@ async def get_agent_by_id(
 
     return agent
 
+
 @router.patch('/agents/{agent_id}/status', response_model=AgentResponse)
 async def update_agent_status(
     agent_id: UUID,
     status_data: AgentStatusUpdate,
-    db:AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles("ADMIN"))
 ):
-    agent = await admin_service.update_user_status(db, agent_id, role = "AGENT",is_active=status_data.is_active)
-    
+    # Capture the previous account status BEFORE updating it.
+    existing_agent = await admin_service.get_agent_by_id(
+        db=db,
+        agent_id=agent_id
+    )
+
+    if existing_agent is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent not found"
+        )
+
+    was_active = existing_agent.is_active
+
+    agent = await admin_service.update_user_status(
+        db,
+        agent_id,
+        role="AGENT",
+        is_active=status_data.is_active
+    )
+
     if agent is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Agent not found"
         )
-        
+
+    should_disconnect = (
+        was_active and not status_data.is_active
+    )
+
     await db.commit()
     await db.refresh(agent)
-    
+
+    if should_disconnect:
+        await websocket_manager.disconnect_user_from_all_tickets(
+            user_id=agent.id
+        )
+
     return agent
 
 @router.get("/customers", response_model=list[UserResponse])
@@ -113,6 +143,7 @@ async def get_customer_by_id(
 
     return customer
 
+
 @router.patch(
     "/customers/{customer_id}/status",
     response_model=UserResponse
@@ -123,6 +154,20 @@ async def update_customer_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles("ADMIN"))
 ):
+    # Capture the previous account status BEFORE updating it.
+    existing_customer = await admin_service.get_customer_by_id(
+        db=db,
+        customer_id=customer_id
+    )
+
+    if existing_customer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found"
+        )
+
+    was_active = existing_customer.is_active
+
     customer = await admin_service.update_user_status(
         db=db,
         user_id=customer_id,
@@ -136,10 +181,20 @@ async def update_customer_status(
             detail="Customer not found"
         )
 
+    should_disconnect = (
+        was_active and not status_data.is_active
+    )
+
     await db.commit()
     await db.refresh(customer)
 
+    if should_disconnect:
+        await websocket_manager.disconnect_user_from_all_tickets(
+            user_id=customer.id
+        )
+
     return customer
+
 
 @router.post(
     "/categories",

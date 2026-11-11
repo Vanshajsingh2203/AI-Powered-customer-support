@@ -8,6 +8,8 @@ from app.api.v1.endpoints import attachments
 from app.api.v1.endpoints import admin
 from app.api.v1.endpoints import analytics
 from app.api.v1.endpoints import categories
+from app.api.v1.endpoints import websockets
+
 
 api_router = APIRouter()
 
@@ -64,3 +66,8 @@ api_router.include_router(
     prefix="/categories",
     tags=["Categories"],
 )
+
+api_router.include_router(
+    websockets.router, 
+    prefix="/ws", 
+    tags=["WebSockets"])

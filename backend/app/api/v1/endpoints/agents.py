@@ -8,7 +8,10 @@ from app.services.assignment_service import AssignmentService
 from app.schemas.ticket import TicketResponse, TicketAssign, TicketAssignmentResponse, TicketAgentUpdate
 from app.services.ticket_service import TicketService
 from app.schemas.ticket import TicketListResponse
+from sqlalchemy import select
 
+from app.models.ticket import Ticket
+from app.core.websocket_manager import websocket_manager
 router = APIRouter()
 assignment_service = AssignmentService()
 ticket_service = TicketService()
@@ -62,29 +65,66 @@ async def get_assigned_tickets(
 
     return result
 
-@router.post('/tickets/{ticket_id}/assign', response_model=TicketAssignmentResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    '/tickets/{ticket_id}/assign',
+    response_model=TicketAssignmentResponse,
+    status_code=status.HTTP_201_CREATED
+)
 async def assign_ticket(
     ticket_id: UUID,
     assignment_data: TicketAssign,
-    db:AsyncSession = Depends(get_db),
-    current_user : User = Depends(require_roles("ADMIN"))
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("ADMIN"))
 ):
     try:
-        assignment = await assignment_service.assign_ticket(db, ticket_id , assignment_data, current_user)
-        
+        # 1. Lock the ticket and remember its previously assigned agent.
+        result = await db.execute(
+            select(Ticket)
+            .where(Ticket.id == ticket_id)
+            .with_for_update()
+        )
+
+        ticket = result.scalar_one_or_none()
+
+        previous_agent_id = (
+            ticket.assigned_agent_id if ticket is not None else None
+        )
+
+        # 2. Perform the assignment using the existing service.
+        assignment = await assignment_service.assign_ticket(
+            db,
+            ticket_id,
+            assignment_data,
+            current_user
+        )
+
         if assignment is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket not found",
             )
-            
+
+        # 3. Commit the database transaction.
         await db.commit()
+
+        # 4. Disconnect the previous agent only after a successful commit.
+        if (
+            previous_agent_id is not None
+            and previous_agent_id != assignment.agent_id
+        ):
+            await websocket_manager.disconnect_user(
+                ticket_id=ticket_id,
+                user_id=previous_agent_id,
+            )
+
         await db.refresh(assignment)
-        
+
         return assignment
-    
-    except  ValueError as error:
+
+    except ValueError as error:
         await db.rollback()
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
