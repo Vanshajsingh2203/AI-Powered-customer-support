@@ -14,6 +14,11 @@ import {
   sendTicketMessage,
 } from '../api/tickets';
 
+import {
+  createWebSocketTicket,
+  connectToTicketWebSocket,
+} from '../api/websocket';
+
 // Status transitions allowed by the backend.
 const allowedStatusTransitions = {
   OPEN: ['IN_PROGRESS'],
@@ -58,8 +63,31 @@ function AgentTicketDetailsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [connectionStatus, setConnectionStatus] =
+    useState('disconnected');
+
+  // Add a message only if it does not already exist.
+  const addMessageIfNew = (newMessage) => {
+    setMessages((previousMessages) => {
+      const alreadyExists = previousMessages.some(
+        (message) => message.id === newMessage.id
+      );
+
+      if (alreadyExists) {
+        return previousMessages;
+      }
+
+      return [...previousMessages, newMessage].sort(
+        (a, b) =>
+          new Date(a.created_at) - new Date(b.created_at)
+      );
+    });
+  };
+
   // Load ticket and conversation.
   useEffect(() => {
+    let cancelled = false;
+
     const loadTicketData = async () => {
       try {
         setLoading(true);
@@ -73,23 +101,163 @@ function AgentTicketDetailsPage() {
           }),
         ]);
 
+        if (cancelled) return;
+
         setTicket(ticketData);
         setMessages(messageData);
 
         setSelectedStatus(ticketData.status);
         setSelectedPriority(ticketData.priority);
       } catch (err) {
+        if (cancelled) return;
+
         setError(
           err.response?.data?.detail ||
           'Unable to load ticket details.'
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     loadTicketData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [ticketId]);
+
+  // Establish a WebSocket connection for real-time messages.
+  useEffect(() => {
+    if (!ticket || !user?.id) {
+      return;
+    }
+
+    let cancelled = false;
+    let socket = null;
+
+    const establishConnection = async () => {
+      try {
+        setConnectionStatus('connecting');
+
+        // Obtain a short-lived, single-use WebSocket ticket.
+        const ticketData = await createWebSocketTicket();
+
+        if (cancelled) return;
+
+        // Connect to this ticket's WebSocket.
+        socket = connectToTicketWebSocket(
+          ticketId,
+          ticketData.ticket
+        );
+
+        socket.onopen = async () => {
+          if (cancelled) return;
+
+          setConnectionStatus('connected');
+
+          // Refresh history after connection to cover
+          // messages sent during the connection process.
+          try {
+            const latestMessages = await getTicketMessages(
+              ticketId,
+              {
+                limit: 100,
+                offset: 0,
+              }
+            );
+
+            if (cancelled) return;
+
+            setMessages((previousMessages) => {
+              const messageMap = new Map();
+
+              previousMessages.forEach((message) => {
+                messageMap.set(message.id, message);
+              });
+
+              latestMessages.forEach((message) => {
+                messageMap.set(message.id, message);
+              });
+
+              return Array.from(messageMap.values()).sort(
+                (a, b) =>
+                  new Date(a.created_at) -
+                  new Date(b.created_at)
+              );
+            });
+          } catch (err) {
+            console.error(
+              'Failed to refresh message history:',
+              err
+            );
+          }
+        };
+
+        // Receive public messages and internal notes.
+        socket.onmessage = (event) => {
+          try {
+            const incomingData = JSON.parse(event.data);
+
+            // Ignore connection confirmations and other
+            // objects that are not actual ticket messages.
+            if (
+              !incomingData.id ||
+              !incomingData.sender_id ||
+              typeof incomingData.content !== 'string'
+            ) {
+              return;
+            }
+
+            // Agents are allowed to receive both public
+            // messages and internal notes.
+            addMessageIfNew(incomingData);
+
+          } catch (err) {
+            console.error(
+              'Failed to process WebSocket message:',
+              err
+            );
+          }
+        };
+
+        socket.onclose = () => {
+          if (!cancelled) {
+            setConnectionStatus('disconnected');
+          }
+        };
+
+        socket.onerror = (err) => {
+          console.error('WebSocket connection error:', err);
+          setConnectionStatus('disconnected');
+        };
+
+      } catch (err) {
+        if (cancelled) return;
+
+        console.error(
+          'Failed to establish WebSocket connection:',
+          err
+        );
+
+        setConnectionStatus('disconnected');
+      }
+    };
+
+    establishConnection();
+
+    // Close the connection when leaving the page
+    // or switching to another ticket.
+    return () => {
+      cancelled = true;
+
+      if (socket) {
+        socket.close();
+      }
+    };
+  }, [ticketId, ticket, user?.id]);
 
   // Send a public reply or internal note.
   const handleSendMessage = async (event) => {
@@ -97,7 +265,7 @@ function AgentTicketDetailsPage() {
 
     const content = newMessage.trim();
 
-    if (!content) {
+    if (!content || sending) {
       return;
     }
 
@@ -111,10 +279,10 @@ function AgentTicketDetailsPage() {
         is_internal: activeTab === 'INTERNAL',
       });
 
-      setMessages((previousMessages) => [
-        ...previousMessages,
-        sentMessage,
-      ]);
+      // Add the HTTP response immediately.
+      // WebSocket delivery of the same message will
+      // be ignored because its ID already exists.
+      addMessageIfNew(sentMessage);
 
       setNewMessage('');
 
@@ -124,6 +292,8 @@ function AgentTicketDetailsPage() {
           : 'Public reply sent successfully.'
       );
     } catch (err) {
+      console.error('Failed to send message:', err);
+
       setError(
         err.response?.data?.detail ||
         'Unable to send message.'
@@ -369,7 +539,29 @@ function AgentTicketDetailsPage() {
       <div className="card shadow-sm">
 
         <div className="card-header bg-white">
-          <h5 className="mb-1">Ticket Conversation</h5>
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+
+            <h5 className="mb-1">Ticket Conversation</h5>
+
+            <small
+              className={
+                connectionStatus === 'connected'
+                  ? 'text-success'
+                  : connectionStatus === 'connecting'
+                    ? 'text-warning'
+                    : 'text-danger'
+              }
+            >
+              <span className="me-1">●</span>
+
+              {connectionStatus === 'connected'
+                ? 'Live connection'
+                : connectionStatus === 'connecting'
+                  ? 'Connecting...'
+                  : 'Live connection unavailable'}
+            </small>
+
+          </div>
 
           <small className="text-muted">
             Communicate with the customer or discuss the ticket privately with staff.
