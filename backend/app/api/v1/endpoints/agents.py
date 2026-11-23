@@ -153,7 +153,7 @@ async def update_assigned_ticket(
         await db.commit()
         await db.refresh(ticket)
         
-        return ticket
+        return ticket_service.to_ticket_response(ticket)
     
     except ValueError as exc:
         await db.rollback()

@@ -129,7 +129,9 @@ class TicketService:
     ):
         result = await db.execute(
             select(Ticket)
-            .options(selectinload(Ticket.category))
+            .options(selectinload(Ticket.category),
+                     selectinload(Ticket.customer),
+                     selectinload(Ticket.assigned_agent))
             .where(Ticket.id == ticket_id)
             .with_for_update()
         )
