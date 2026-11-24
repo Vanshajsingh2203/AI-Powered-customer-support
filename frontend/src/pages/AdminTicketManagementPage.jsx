@@ -86,6 +86,7 @@ function AdminTicketManagementPage() {
                 ...item,
                 assigned_agent_id: assignment.agent_id,
                 assigned_agent_name: agent?.full_name || null,
+                assignment_source: 'ADMIN',
               }
             : item
         )
@@ -232,16 +233,23 @@ function AdminTicketManagementPage() {
                       {/* Currently assigned agent */}
                       <td>
                         {ticket.assigned_agent_name ? (
-                          <span className="badge bg-success">
-                            {ticket.assigned_agent_name}
-                          </span>
+                          <>
+                            <span className="badge bg-success">
+                              {ticket.assigned_agent_name}
+                            </span>
+                        
+                            {ticket.assignment_source === 'AUTO' && (
+                              <span className="badge bg-secondary ms-1">
+                                Auto-assigned
+                              </span>
+                            )}
+                          </>
                         ) : (
                           <span className="text-muted">
                             Not assigned
                           </span>
                         )}
                       </td>
-
                       {/* Assign or reassign agent */}
                       <td>
                         <div className="d-flex gap-2">

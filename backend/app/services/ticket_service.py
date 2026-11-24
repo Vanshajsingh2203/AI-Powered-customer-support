@@ -237,6 +237,7 @@ class TicketService:
         customer_name=ticket.customer.full_name,
         customer_email=ticket.customer.email,
         assigned_agent_id=ticket.assigned_agent_id,
+        assignment_source=ticket.assignment_source,
         assigned_agent_name=(
             ticket.assigned_agent.full_name
             if ticket.assigned_agent
@@ -348,7 +349,9 @@ class TicketService:
 ):
         result = await db.execute(
         select(Ticket)
-        .options(selectinload(Ticket.category))
+        .options(selectinload(Ticket.category),
+                 selectinload(Ticket.assigned_agent)
+                 )
         .where(Ticket.id == ticket_id)
         )
 

@@ -63,10 +63,18 @@ class AssignmentService:
         # 4. Avoid duplicate assignment and notification
         if active_assignment is not None:
             if active_assignment.agent_id == agent.id:
+                # Admin confirmation converts automatic assignment to manual.
+                if active_assignment.assigned_by is None:
+                    active_assignment.assigned_by = current_user.id
+    
+                ticket.assignment_source = "ADMIN"
+
+                await db.flush()
+
                 return active_assignment
-    
+            
             active_assignment.unassigned_at = datetime.now(timezone.utc)
-    
+                
         # 5. Create a new assignment record
         new_assignment = TicketAssignment(
             ticket_id=ticket_id,
@@ -78,7 +86,9 @@ class AssignmentService:
     
         # 6. Update the ticket's currently assigned agent
         ticket.assigned_agent_id = agent.id
-    
+        # A manual assignment always takes priority over an automatic one.
+        ticket.assignment_source = "ADMIN"
+        
         # 7. Create notification for the newly assigned agent
         await notification_service.create_notification(
             db=db,

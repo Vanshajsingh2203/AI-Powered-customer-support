@@ -22,7 +22,7 @@ class TicketResponse(BaseModel):
     assigned_agent_name: str | None = None
     customer_name: str
     customer_email: str
-    
+    assignment_source: str | None = None
     model_config = ConfigDict(from_attributes=True)
     
     

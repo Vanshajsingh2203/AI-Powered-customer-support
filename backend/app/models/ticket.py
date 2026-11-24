@@ -19,6 +19,11 @@ class Ticket(Base):
             "priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')",
             name="check_ticket_priority",
         ),
+        CheckConstraint(
+            "assignment_source IN ('AUTO', 'ADMIN')",
+            name="check_ticket_assignment_source",
+        ),
+        
         
         Index("ix_tickets_customer_id", "customer_id"),
         Index("ix_tickets_assigned_agent_id", "assigned_agent_id"),
@@ -66,6 +71,15 @@ class Ticket(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    
+    # How the current assigned_agent_id was chosen:
+    # AUTO = automatic assignment
+    # ADMIN = manual admin assignment
+    # NULL = ticket has never been assigned
+    assignment_source: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,  
     )
     
     created_at: Mapped[datetime] = mapped_column(
