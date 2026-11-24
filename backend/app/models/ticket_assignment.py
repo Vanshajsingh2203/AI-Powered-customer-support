@@ -41,10 +41,10 @@ class TicketAssignment(Base):
         nullable=False,
     )
 
-    assigned_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(
+    UUID(as_uuid=True),
+    ForeignKey("users.id", ondelete="RESTRICT"),
+    nullable=True,
     )
 
     assigned_at: Mapped[datetime] = mapped_column(

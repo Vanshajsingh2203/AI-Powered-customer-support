@@ -6,6 +6,7 @@ from app.database.session import get_db
 from app.dependencies import get_current_user
 from app.schemas.ticket import TicketCreate, TicketUpdate, TicketResponse
 from app.services.ticket_service import TicketService
+from app.services.auto_assignment import auto_assign_ticket
 from fastapi import Query
 from app.schemas.ticket import TicketListResponse
     
@@ -26,7 +27,7 @@ async def create_ticket(
         ticket = await ticket_service.create_ticket(
             db, ticket_data, current_user
         )
-
+        await auto_assign_ticket(db=db, ticket_id=ticket.id)
         await db.commit()
 
         # Retrieve ticket with its category eagerly loaded.
