@@ -156,3 +156,10 @@ class Ticket(Base):
     back_populates="ticket",
     cascade="all, delete-orphan"
     )
+
+    ai_classification = relationship(
+        "TicketAIClassification",
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
