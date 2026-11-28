@@ -12,6 +12,7 @@ import {
 import {
   getTicketMessages,
   sendTicketMessage,
+  getTicketSummary,
 } from '../api/tickets';
 
 // Status transitions allowed by the backend.
@@ -57,6 +58,11 @@ function AdminTicketDetailsPage() {
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // AI summary states.
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
 
   // Load ticket and conversation.
   useEffect(() => {
@@ -174,6 +180,35 @@ function AdminTicketDetailsPage() {
       );
     } finally {
       setUpdating(false);
+    }
+  };
+
+  // Generate AI summary.
+  const handleGenerateSummary = async () => {
+    if (summaryLoading) {
+      return;
+    }
+
+    try {
+      setSummaryLoading(true);
+      setSummaryError('');
+      setSummary(null);
+      setError('');
+      setSuccess('');
+
+      const summaryData = await getTicketSummary(ticketId);
+
+      setSummary(summaryData);
+      setSuccess('AI summary generated successfully.');
+    } catch (err) {
+      console.error('Failed to generate AI summary:', err);
+
+      setSummaryError(
+        err.response?.data?.detail ||
+        'Unable to generate AI summary.'
+      );
+    } finally {
+      setSummaryLoading(false);
     }
   };
 
@@ -382,6 +417,139 @@ function AdminTicketDetailsPage() {
 
             </div>
           </form>
+
+          {/* AI Ticket Summary */}
+          <div className="mt-4">
+            <hr />
+
+            <h6 className="mb-3">
+              AI-Powered Ticket Assistance
+            </h6>
+
+            <button
+              type="button"
+              className="btn btn-info w-100"
+              disabled={summaryLoading}
+              onClick={handleGenerateSummary}
+            >
+              {summaryLoading
+                ? 'Generating AI Summary...'
+                : 'Generate AI Summary'}
+            </button>
+
+            {summaryLoading && (
+              <div className="text-center mt-3">
+                <div
+                  className="spinner-border spinner-border-sm text-info"
+                  role="status"
+                />
+                <p className="text-muted small mt-2 mb-0">
+                  AI is analysing the ticket and conversation...
+                </p>
+              </div>
+            )}
+
+            {summaryError && (
+              <div className="alert alert-danger mt-3">
+                {summaryError}
+              </div>
+            )}
+
+            {summary && (
+              <div className="card mt-3">
+                <div className="card-header bg-light">
+                  <h6 className="mb-0">
+                    AI Ticket Summary
+                  </h6>
+                </div>
+
+                <div className="card-body">
+
+                  {/* Issue Summary */}
+                  <div className="mb-3">
+                    <h6>Issue Summary</h6>
+                    <p className="mb-0">
+                      {summary.issue_summary}
+                    </p>
+                  </div>
+
+                  <hr />
+
+                  {/* Current Situation */}
+                  <div className="mb-3">
+                    <h6>Current Situation</h6>
+                    <p className="mb-0">
+                      {summary.current_situation}
+                    </p>
+                  </div>
+
+                  <hr />
+
+                  {/* Key Points */}
+                  <div className="mb-3">
+                    <h6>Key Points</h6>
+
+                    {summary.key_points?.length > 0 ? (
+                      <ul className="mb-0">
+                        {summary.key_points.map((point, index) => (
+                          <li key={index}>{point}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-muted mb-0">
+                        No key points identified.
+                      </p>
+                    )}
+                  </div>
+
+                  <hr />
+
+                  {/* Troubleshooting Steps */}
+                  <div className="mb-3">
+                    <h6>
+                      Troubleshooting Steps Already Attempted
+                    </h6>
+
+                    {summary.troubleshooting_steps?.length > 0 ? (
+                      <ul className="mb-0">
+                        {summary.troubleshooting_steps.map(
+                          (step, index) => (
+                            <li key={index}>{step}</li>
+                          )
+                        )}
+                      </ul>
+                    ) : (
+                      <p className="text-muted mb-0">
+                        No troubleshooting steps have been recorded.
+                      </p>
+                    )}
+                  </div>
+
+                  <hr />
+
+                  {/* Unresolved Questions */}
+                  <div>
+                    <h6>Unresolved Questions</h6>
+
+                    {summary.unresolved_questions?.length > 0 ? (
+                      <ul className="mb-0">
+                        {summary.unresolved_questions.map(
+                          (question, index) => (
+                            <li key={index}>{question}</li>
+                          )
+                        )}
+                      </ul>
+                    ) : (
+                      <p className="text-muted mb-0">
+                        No unresolved questions identified.
+                      </p>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

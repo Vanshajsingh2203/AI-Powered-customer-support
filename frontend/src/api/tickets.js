@@ -49,3 +49,10 @@ export const sendTicketMessage = async (
 
   return response.data;
 };
+
+// Generate AI summary for a ticket.
+export const getTicketSummary = async (ticketId) => {
+  const response = await api.post(`/tickets/${ticketId}/summary`);
+
+  return response.data;
+};

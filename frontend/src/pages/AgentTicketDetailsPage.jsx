@@ -12,6 +12,7 @@ import {
 import {
   getTicketMessages,
   sendTicketMessage,
+  getTicketSummary,
 } from '../api/tickets';
 
 import {
@@ -62,6 +63,10 @@ function AgentTicketDetailsPage() {
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
 
   const [connectionStatus, setConnectionStatus] =
     useState('disconnected');
@@ -303,6 +308,33 @@ function AgentTicketDetailsPage() {
     }
   };
 
+  // Generate AI summary of the ticket conversation.
+  const handleGenerateSummary = async () => {
+    if (summaryLoading) {
+      return;
+    }
+
+    try {
+      setSummaryLoading(true);
+      setSummaryError('');
+      setSummary(null);
+
+      const summaryData = await getTicketSummary(ticketId);
+
+      setSummary(summaryData);
+      setSuccess('AI summary generated successfully.');
+    } catch (err) {
+      console.error('Failed to generate summary:', err);
+
+      setSummaryError(
+        err.response?.data?.detail ||
+        'Unable to generate summary.'
+      );
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   // Update ticket status or priority.
   const handleUpdateTicket = async (event) => {
     event.preventDefault();
@@ -532,6 +564,57 @@ function AgentTicketDetailsPage() {
 
             </div>
           </form>
+
+          <div className="mt-3">
+            <button
+              type="button"
+              className="btn btn-info w-100"
+              disabled={summaryLoading}
+              onClick={handleGenerateSummary}
+            >
+              {summaryLoading ? 'Generating...' : 'Generate AI Summary'}
+            </button>
+            {summaryError && (
+              <div className="alert alert-danger mt-2">{summaryError}</div>
+            )}
+            {summary && (
+              <div className="card mt-2">
+                <div className="card-header bg-light">
+                  <h6 className="mb-0">AI Summary</h6>
+                </div>
+                <div className="card-body">
+                  <p className="mb-3"><strong>Issue:</strong> {summary.issue_summary}</p>
+                  <p className="mb-3"><strong>Current Situation:</strong> {summary.current_situation}</p>
+                  <h6 className="mb-2">Key Points</h6>
+                  <ul className="list-unstyled mb-3">
+                    {summary.key_points.map((point, idx) => (
+                      <li key={idx}>{point}</li>
+                    ))}
+                  </ul>
+                  {summary.troubleshooting_steps.length > 0 && (
+                    <>
+                      <h6 className="mb-2">Troubleshooting Steps</h6>
+                      <ul className="list-unstyled mb-3">
+                        {summary.troubleshooting_steps.map((step, idx) => (
+                          <li key={idx}>{step}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {summary.unresolved_questions.length > 0 && (
+                    <>
+                      <h6 className="mb-2">Unresolved Questions</h6>
+                      <ul className="list-unstyled mb-3">
+                        {summary.unresolved_questions.map((q, idx) => (
+                          <li key={idx}>{q}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

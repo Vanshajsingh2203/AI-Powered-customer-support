@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, func
@@ -8,6 +9,11 @@ from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate, Ticke
 from app.models.user import User
 from app.services.audit_service import audit_service
 from app.models.category import Category
+from app.services.category_service import category_service
+from app.ai.services.ticket_ai_service import classify_ticket
+from app.models.ticket_ai_classification import TicketAIClassification
+
+logger = logging.getLogger(__name__)
 
 class TicketService:
     async def create_ticket(
@@ -18,8 +24,11 @@ class TicketService:
 ) -> Ticket:
 
         category = None
+        priority = "MEDIUM"
+        classification_result = None
 
         if ticket_data.category_id is not None:
+            # Customer-provided category — validate and use it, skip AI classification.
             result = await db.execute(
                 select(Category).where(
                     Category.id == ticket_data.category_id
@@ -30,19 +39,63 @@ class TicketService:
 
             if category is None:
                 raise ValueError("Invalid category ID")
+        else:
+            # AI classification when the customer did not select a category.
+            try:
+                # Retrieve active categories from the database.
+                db_categories = await category_service.get_categories(db)
+                available_categories = [c.name for c in db_categories]
+
+                if available_categories:
+                    classification = await classify_ticket(
+                        title=ticket_data.title,
+                        description=ticket_data.description,
+                        available_categories=available_categories,
+                    )
+
+                    # Map returned category name to Category database record.
+                    category_result = await db.execute(
+                        select(Category).where(
+                            func.lower(Category.name) == classification.category.lower()
+                        )
+                    )
+                    category = category_result.scalar_one_or_none()
+
+                    # Use AI-classified priority.
+                    priority = classification.priority
+
+                    # Keep the classification result for persistence after ticket flush.
+                    classification_result = classification
+
+            except Exception as exc:
+                # AI failure must not prevent ticket creation.
+                logger.error("AI classification failed: %s", type(exc).__name__)
+                # priority remains "MEDIUM", category remains None.
 
         new_ticket = Ticket(
             title=ticket_data.title,
             description=ticket_data.description,
             customer_id=current_user.id,
             category_id=category.id if category else None,
-            priority="MEDIUM",
+            priority=priority,
             status="OPEN",
         )
 
         db.add(new_ticket)
 
         await db.flush()
+
+        # Persist AI classification details if AI succeeded.
+        if classification_result is not None:
+            ai_classification = TicketAIClassification(
+                ticket_id=new_ticket.id,
+                sentiment=classification_result.sentiment,
+                confidence=classification_result.confidence,
+                reasoning=classification_result.reasoning,
+            )
+            db.add(ai_classification)
+
+            await db.flush()
 
         return new_ticket
     
