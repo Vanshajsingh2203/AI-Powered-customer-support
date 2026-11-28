@@ -222,11 +222,15 @@ async def get_ticket_summary(
     conversation_parts = []
 
     for msg in messages:
-        sender_name = msg.sender.full_name if msg.sender else "Unknown"
-        sender_role = msg.sender.role if msg.sender else "Unknown"
+        sender_name = msg.sender_name or "Unknown"
+        sender_role = msg.sender_role or "Unknown"
 
+        message_type = (
+        "Internal Note" if msg.is_internal else "Public Reply"
+        )
+        
         content_line = (
-            f"{sender_name} ({sender_role}): {msg.content}"
+            f"{message_type} | {sender_name} ({sender_role}): {msg.content}"
         )
 
         conversation_parts.append(content_line)
